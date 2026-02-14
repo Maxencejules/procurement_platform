@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.db
+.env
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Testing
+htmlcov/
+.coverage
+playwright-report/
+test-results/
+
+# Docker
+pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
