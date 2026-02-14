@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from decimal import Decimal
 
@@ -15,13 +14,6 @@ from app.models import (
 
 
 TEST_DB_URL = "sqlite+aiosqlite:///./test.db"
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture

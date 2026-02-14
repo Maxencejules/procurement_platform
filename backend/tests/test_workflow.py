@@ -1,8 +1,11 @@
 import pytest
 from decimal import Decimal
 
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
 from app.models import PurchaseRequest, RequestStatus, ApprovalPolicy, PolicyRule
-from app.models.approval import DecisionType
+from app.models.approval import ApprovalStep, DecisionType
 from app.workflow.engine import (
     evaluate_rule, matches_policy, route_approval, process_decision, transition_status,
 )
@@ -43,17 +46,27 @@ class TestEvaluateRule:
 
 
 class TestMatchesPolicy:
-    @pytest.mark.asyncio
     async def test_policy_with_matching_rules(self, session, approval_policy, sample_request):
-        assert matches_policy(approval_policy, sample_request) is True
+        # Eagerly reload policy with rules for aiosqlite compatibility
+        result = await session.execute(
+            select(ApprovalPolicy).options(selectinload(ApprovalPolicy.rules))
+            .where(ApprovalPolicy.id == approval_policy.id)
+        )
+        policy = result.scalar_one()
+        assert matches_policy(policy, sample_request) is True
 
-    @pytest.mark.asyncio
     async def test_policy_without_rules_matches_all(self, session, org, approver_user, sample_request):
         policy = ApprovalPolicy(
             name="Match All", org_id=org.id, approver_id=approver_user.id, priority=1,
         )
         session.add(policy)
         await session.flush()
+        # Reload to get empty rules collection
+        result = await session.execute(
+            select(ApprovalPolicy).options(selectinload(ApprovalPolicy.rules))
+            .where(ApprovalPolicy.id == policy.id)
+        )
+        policy = result.scalar_one()
         assert matches_policy(policy, sample_request) is True
 
 

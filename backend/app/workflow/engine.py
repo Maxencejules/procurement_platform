@@ -93,16 +93,21 @@ async def process_decision(
     session.add(approval_decision)
     step.status = decision.value
 
-    request = step.purchase_request
+    # Explicitly load the purchase request and sibling steps
+    request = await session.get(PurchaseRequest, step.purchase_request_id)
+    sibling_result = await session.execute(
+        select(ApprovalStep).where(ApprovalStep.purchase_request_id == request.id)
+    )
+    all_steps = sibling_result.scalars().all()
 
     if decision == DecisionType.REJECTED:
         await transition_status(session, request, RequestStatus.REJECTED, user_id)
         # Mark remaining pending steps as skipped
-        for s in request.approval_steps:
+        for s in all_steps:
             if s.status == "pending" and s.id != step.id:
                 s.status = "skipped"
     elif decision == DecisionType.APPROVED:
-        pending_steps = [s for s in request.approval_steps if s.status == "pending" and s.id != step.id]
+        pending_steps = [s for s in all_steps if s.status == "pending" and s.id != step.id]
         if not pending_steps:
             await transition_status(session, request, RequestStatus.APPROVED, user_id)
 
