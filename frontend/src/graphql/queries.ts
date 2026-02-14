@@ -178,25 +178,6 @@ export const GET_APPROVAL_INBOX = gql`
   }
 `
 
-// Extended fragment for inbox - we need purchase_request on step
-export const GET_APPROVAL_INBOX_FULL = gql`
-  query ApprovalInbox {
-    approvalInbox {
-      id
-      stepOrder
-      status
-      approverId
-      approver {
-        fullName
-      }
-      policy {
-        name
-      }
-      createdAt
-    }
-  }
-`
-
 export const APPROVE_STEP = gql`
   mutation ApproveStep($stepId: ID!, $comments: String) {
     approveStep(stepId: $stepId, comments: $comments) {

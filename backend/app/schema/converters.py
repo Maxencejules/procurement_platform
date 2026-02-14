@@ -47,7 +47,10 @@ def to_decision_type(d: ApprovalDecision | None) -> ApprovalDecisionType | None:
     )
 
 
-def to_step_type(s: ApprovalStep) -> ApprovalStepType:
+def to_step_type(s: ApprovalStep, include_request: bool = False) -> ApprovalStepType:
+    pr = None
+    if include_request and s.purchase_request:
+        pr = to_request_type(s.purchase_request)
     return ApprovalStepType(
         id=str(s.id), policy_id=str(s.policy_id),
         policy=to_policy_type(s.policy) if s.policy else None,
@@ -55,6 +58,7 @@ def to_step_type(s: ApprovalStep) -> ApprovalStepType:
         approver=to_user_type(s.approver) if s.approver else None,
         step_order=s.step_order, status=s.status,
         decision=to_decision_type(s.decision),
+        purchase_request=pr,
         created_at=s.created_at,
     )
 

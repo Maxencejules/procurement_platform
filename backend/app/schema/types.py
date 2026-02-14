@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import strawberry
 
@@ -56,19 +58,6 @@ class ApprovalDecisionType:
 
 
 @strawberry.type
-class ApprovalStepType:
-    id: strawberry.ID
-    policy_id: strawberry.ID
-    policy: Optional[ApprovalPolicyType]
-    approver_id: strawberry.ID
-    approver: Optional[UserType]
-    step_order: int
-    status: str
-    decision: Optional[ApprovalDecisionType]
-    created_at: datetime
-
-
-@strawberry.type
 class PurchaseRequestType:
     id: strawberry.ID
     title: str
@@ -87,6 +76,20 @@ class PurchaseRequestType:
     submitted_at: Optional[datetime]
     approved_at: Optional[datetime]
     rejected_at: Optional[datetime]
+
+
+@strawberry.type
+class ApprovalStepType:
+    id: strawberry.ID
+    policy_id: strawberry.ID
+    policy: Optional[ApprovalPolicyType]
+    approver_id: strawberry.ID
+    approver: Optional[UserType]
+    step_order: int
+    status: str
+    decision: Optional[ApprovalDecisionType]
+    purchase_request: Optional[PurchaseRequestType]
+    created_at: datetime
 
 
 @strawberry.type

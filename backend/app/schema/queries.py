@@ -91,7 +91,7 @@ class Query:
             )
             .order_by(ApprovalStep.created_at.desc())
         )
-        return [to_step_type(s) for s in result.scalars().all()]
+        return [to_step_type(s, include_request=True) for s in result.scalars().all()]
 
     @strawberry.field
     async def approval_policies(self, info: Info) -> list[ApprovalPolicyType]:

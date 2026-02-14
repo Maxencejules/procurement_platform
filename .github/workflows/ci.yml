@@ -106,6 +106,8 @@ jobs:
           sleep 3
 
       - name: Install and build frontend
+        env:
+          VITE_GRAPHQL_URL: http://localhost:8000/graphql
         run: |
           cd frontend
           npm install
