@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 import strawberry
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from strawberry.fastapi import GraphQLRouter
 
@@ -28,21 +28,20 @@ async def lifespan(app: FastAPI):
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
 
-async def get_context(request=None, response=None):
+async def get_context(request: Request) -> dict:
     session = async_session()
     ctx = {"session": session, "auth": None}
 
-    if request:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-            payload = decode_token(token)
-            if payload:
-                ctx["auth"] = AuthContext(
-                    user_id=payload["sub"],
-                    org_id=payload["org_id"],
-                    role=payload["role"],
-                )
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        payload = decode_token(token)
+        if payload:
+            ctx["auth"] = AuthContext(
+                user_id=payload["sub"],
+                org_id=payload["org_id"],
+                role=payload["role"],
+            )
     return ctx
 
 
