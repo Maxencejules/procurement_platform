@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 from uuid import UUID
+from typing import AsyncGenerator
 
 import strawberry
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 from strawberry.fastapi import GraphQLRouter
 
 from app.auth.jwt import decode_token
@@ -28,8 +30,18 @@ async def lifespan(app: FastAPI):
 schema = strawberry.Schema(query=Query, mutation=Mutation)
 
 
-async def get_context(request: Request) -> dict:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     session = async_session()
+    try:
+        yield session
+    finally:
+        await session.close()
+
+
+async def get_context(
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
     ctx = {"session": session, "auth": None}
 
     auth_header = request.headers.get("Authorization", "")

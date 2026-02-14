@@ -25,8 +25,8 @@ test.describe('Procurement Full Flow', () => {
     // Save and submit
     await page.click('text=Save & Submit')
 
-    // Should navigate to request detail
-    await page.waitForURL('**/requests/**')
+    // Should navigate to request detail (not /requests/new)
+    await page.waitForURL(/\/requests\/[0-9a-f-]+$/, { timeout: 15000 })
     await expect(page.locator('h2')).toContainText(uniqueTitle)
 
     // Verify status is pending_approval or submitted
@@ -67,12 +67,7 @@ test.describe('Procurement Full Flow', () => {
 
     // Step 5: Navigate to the request detail to verify final status
     await page.goto(requestUrl)
-    await page.waitForTimeout(500)
-
-    // Check for approved status or audit trail
-    const pageContent = await page.textContent('body')
-    // The request should have audit trail entries
-    expect(pageContent).toContain('Audit Trail')
+    await page.waitForSelector('text=Audit Trail', { timeout: 10000 })
 
     // Verify audit log shows status changes
     const auditSection = page.locator('.card', { has: page.locator('text=Audit Trail') })
