@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric, Text, func
+from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric, Text, func, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,7 +21,7 @@ class RequestStatus(str, enum.Enum):
 
 VALID_TRANSITIONS = {
     RequestStatus.DRAFT: {RequestStatus.SUBMITTED, RequestStatus.CANCELLED},
-    RequestStatus.SUBMITTED: {RequestStatus.PENDING_APPROVAL, RequestStatus.CANCELLED},
+    RequestStatus.SUBMITTED: {RequestStatus.PENDING_APPROVAL, RequestStatus.APPROVED, RequestStatus.CANCELLED},
     RequestStatus.PENDING_APPROVAL: {RequestStatus.APPROVED, RequestStatus.REJECTED, RequestStatus.CANCELLED},
     RequestStatus.APPROVED: set(),
     RequestStatus.REJECTED: set(),
@@ -31,6 +31,7 @@ VALID_TRANSITIONS = {
 
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
+    __table_args__ = (CheckConstraint("amount > 0 AND amount <= 9999999999.99", name="ck_request_amount"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255), nullable=False)

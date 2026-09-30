@@ -2,6 +2,7 @@ from functools import wraps
 from uuid import UUID
 
 import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
 from app.models.user import Role
@@ -28,7 +29,7 @@ class AuthContext:
 def get_auth_context(info: Info) -> AuthContext:
     ctx = info.context.get("auth")
     if not ctx:
-        raise PermissionError("Authentication required")
+        raise GraphQLError("Authentication required", extensions={"code": "UNAUTHENTICATED"})
     return ctx
 
 

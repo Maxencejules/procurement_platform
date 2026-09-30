@@ -22,7 +22,7 @@ procurement_platform/
 ### Prerequisites
 - Docker & Docker Compose
 - Python 3.12+
-- Node.js 20+
+- Node.js 24
 
 ### One-command setup
 
@@ -34,7 +34,9 @@ Then start the services:
 
 ```bash
 # Terminal 1 - Backend
-cd backend && uvicorn app.main:app --reload --port 8000
+export DATABASE_URL=postgresql+asyncpg://procurement:procurement@localhost:5433/procurement
+export DATABASE_URL_SYNC=postgresql://procurement:procurement@localhost:5433/procurement
+cd backend && python -m alembic upgrade head && uvicorn app.main:app --reload --port 8000
 
 # Terminal 2 - Frontend
 cd frontend && npm run dev
@@ -133,6 +135,25 @@ The API is available at `/graphql` with an interactive playground.
 ```bash
 cd backend && python -m pytest tests/ -v
 ```
+
+### PostgreSQL transaction proof
+
+```bash
+cd backend
+export TEST_DATABASE_URL=postgresql+asyncpg://procurement_test:procurement_test@localhost:5432/procurement_test
+python scripts/prove_postgres.py
+```
+
+This runs migrations and real row-lock races in disposable schemas. The ordinary
+suite skips these cases when `TEST_DATABASE_URL` is absent; the proof script
+requires a reachable PostgreSQL database. See [the proof and migration guide](docs/postgres-proof.md)
+for the mutation contract, evidence boundaries, and existing-database upgrade steps.
+
+The frontend now uses Vite 8, Vitest 5, and React Router 7.18 with Node 24.
+Review the [Vite migration guide](https://vite.dev/guide/migration.html) when changing
+bundler configuration. React 18 and the existing `react-router-dom` imports remain
+supported by this Router 7 upgrade; the [official v7 package reference](https://api.reactrouter.com/v7/modules/react-router-dom.html)
+documents that re-export compatibility. Use `npm ci` to reproduce the lockfile.
 
 ### Frontend component tests
 ```bash

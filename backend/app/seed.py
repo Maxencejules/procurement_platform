@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.auth.jwt import hash_password
-from app.database import async_session, engine, Base
+from app.database import async_session, engine
 from app.models import (
     Organization, User, Role, PurchaseRequest, RequestStatus,
     ApprovalPolicy, PolicyRule, ApprovalStep, ApprovalDecision, AuditLog,
@@ -18,9 +18,6 @@ import app.models  # noqa: F401
 
 
 async def seed():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
     async with async_session() as session:
         # Check if already seeded
         result = await session.execute(select(Organization))

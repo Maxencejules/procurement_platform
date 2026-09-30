@@ -12,6 +12,7 @@ venv/
 
 # Node
 node_modules/
+*.tsbuildinfo
 dist/
 .cache/
 
@@ -23,6 +24,7 @@ dist/
 # Testing
 htmlcov/
 .coverage
+.pytest_cache/
 playwright-report/
 test-results/
 
