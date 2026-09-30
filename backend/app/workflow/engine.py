@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.approval import ApprovalPolicy, ApprovalStep, ApprovalDecision, DecisionType, PolicyRule
 from app.models.audit_log import AuditLog
 from app.models.purchase_request import PurchaseRequest, RequestStatus, VALID_TRANSITIONS
+from app.errors import WorkflowError
 
 
 def evaluate_rule(rule: PolicyRule, request: PurchaseRequest) -> bool:
@@ -29,10 +30,10 @@ def evaluate_rule(rule: PolicyRule, request: PurchaseRequest) -> bool:
         return ops.get(rule.operator, False)
 
     if rule.operator == "eq":
-        return str(field_value).lower() == rule.value.lower()
+        return str(field_value).strip().lower() == rule.value.strip().lower()
     if rule.operator == "in":
         allowed = [v.strip().lower() for v in rule.value.split(",")]
-        return str(field_value).lower() in allowed
+        return str(field_value).strip().lower() in allowed
 
     return False
 
@@ -49,7 +50,7 @@ async def route_approval(session: AsyncSession, request: PurchaseRequest, user_i
     result = await session.execute(
         select(ApprovalPolicy)
         .where(ApprovalPolicy.org_id == request.org_id, ApprovalPolicy.is_active == True)
-        .order_by(ApprovalPolicy.priority)
+        .order_by(ApprovalPolicy.priority, ApprovalPolicy.id)
     )
     policies = result.scalars().all()
 
@@ -83,7 +84,28 @@ async def process_decision(
     user_id: uuid.UUID,
     comments: str | None = None,
 ) -> PurchaseRequest:
-    """Record an approval decision and advance the workflow."""
+    """Serialize all decisions for a request, then advance its workflow.
+
+    Lock the parent before reading any mutable workflow state. Locking only the
+    chosen step lets simultaneous sibling approvals both miss the final transition.
+    Reload cached ORM state after a lock wait under PostgreSQL READ COMMITTED.
+    """
+    request = (await session.execute(
+        select(PurchaseRequest)
+        .where(PurchaseRequest.id == step.purchase_request_id)
+        .with_for_update(of=PurchaseRequest)
+        .execution_options(populate_existing=True)
+    )).scalar_one()
+    sibling_result = await session.execute(
+        select(ApprovalStep).where(ApprovalStep.purchase_request_id == request.id)
+        .execution_options(populate_existing=True)
+    )
+    all_steps = sibling_result.scalars().all()
+    step = next(s for s in all_steps if s.id == step.id)
+    if step.approver_id != user_id:
+        raise WorkflowError("Not authorized to decide this step", "FORBIDDEN")
+    if request.status != RequestStatus.PENDING_APPROVAL or step.status != "pending":
+        raise WorkflowError("Request or step is no longer pending")
     approval_decision = ApprovalDecision(
         step_id=step.id,
         decision=decision,
@@ -92,13 +114,6 @@ async def process_decision(
     )
     session.add(approval_decision)
     step.status = decision.value
-
-    # Explicitly load the purchase request and sibling steps
-    request = await session.get(PurchaseRequest, step.purchase_request_id)
-    sibling_result = await session.execute(
-        select(ApprovalStep).where(ApprovalStep.purchase_request_id == request.id)
-    )
-    all_steps = sibling_result.scalars().all()
 
     if decision == DecisionType.REJECTED:
         await transition_status(session, request, RequestStatus.REJECTED, user_id)
@@ -126,7 +141,7 @@ async def transition_status(
     allowed = VALID_TRANSITIONS.get(old_status, set())
 
     if new_status not in allowed:
-        raise ValueError(f"Invalid transition from {old_status.value} to {new_status.value}")
+        raise WorkflowError(f"Invalid transition from {old_status.value} to {new_status.value}")
 
     request.status = new_status
     now = datetime.now(timezone.utc)

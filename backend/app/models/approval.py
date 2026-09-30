@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Enum, ForeignKey, Integer, Numeric, Text, func, JSON
+from sqlalchemy import String, DateTime, Enum, ForeignKey, Integer, Numeric, Text, func, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +46,7 @@ class DecisionType(str, enum.Enum):
 
 class ApprovalStep(Base):
     __tablename__ = "approval_steps"
+    __table_args__ = (UniqueConstraint("purchase_request_id", "step_order", name="uq_request_step_order"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     purchase_request_id: Mapped[uuid.UUID] = mapped_column(
@@ -65,6 +66,7 @@ class ApprovalStep(Base):
 
 class ApprovalDecision(Base):
     __tablename__ = "approval_decisions"
+    __table_args__ = (UniqueConstraint("step_id", name="uq_decision_step"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     step_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("approval_steps.id"), nullable=False)

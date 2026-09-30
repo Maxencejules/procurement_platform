@@ -10,7 +10,7 @@ from strawberry.fastapi import GraphQLRouter
 
 from app.auth.jwt import decode_token
 from app.auth.rbac import AuthContext
-from app.database import engine, Base, async_session
+from app.database import engine, async_session
 from app.metrics import PrometheusMiddleware, metrics_endpoint
 from app.schema.queries import Query
 from app.schema.mutations import Mutation
@@ -21,10 +21,11 @@ import app.models  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    await engine.dispose()
+    # Schema changes belong to versioned Alembic migrations, before serving traffic.
+    try:
+        yield
+    finally:
+        await engine.dispose()
 
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)

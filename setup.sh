@@ -18,8 +18,11 @@ cd backend
 pip install -r requirements.txt
 cd ..
 
-echo "3. Running database seed..."
+echo "3. Migrating and seeding the database..."
+export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://procurement:procurement@localhost:5433/procurement}"
+export DATABASE_URL_SYNC="${DATABASE_URL_SYNC:-postgresql://procurement:procurement@localhost:5433/procurement}"
 cd backend
+python -m alembic upgrade head
 python -m app.seed
 cd ..
 
@@ -32,6 +35,7 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "To start the app:"
+echo "  Set DATABASE_URL and DATABASE_URL_SYNC to the same database (local Docker uses port 5433)."
 echo "  Terminal 1 (backend):  cd backend && uvicorn app.main:app --reload --port 8000"
 echo "  Terminal 2 (frontend): cd frontend && npm run dev"
 echo ""

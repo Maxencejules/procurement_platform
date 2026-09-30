@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   backend-tests:
@@ -27,6 +27,36 @@ jobs:
           cd backend
           python -m pytest tests/ -v --tb=short
 
+  postgres-proof:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: procurement
+          POSTGRES_PASSWORD: procurement
+          POSTGRES_DB: procurement_proof
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U procurement -d procurement_proof"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://procurement:procurement@localhost:5432/procurement_proof
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Prove PostgreSQL locking and migrations
+        working-directory: backend
+        run: python scripts/prove_postgres.py
+
   frontend-build:
     runs-on: ubuntu-latest
     steps:
@@ -35,12 +65,16 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
+
+      - name: Check dependency advisories
+        working-directory: frontend
+        run: npm audit --audit-level=high
 
       - name: Run tests
         run: |
@@ -54,7 +88,7 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-build]
+    needs: [backend-tests, postgres-proof, frontend-build]
     services:
       postgres:
         image: postgres:16-alpine
@@ -81,19 +115,20 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install backend dependencies
         run: |
           cd backend
           pip install -r requirements.txt
 
-      - name: Seed database
+      - name: Migrate and seed database
         env:
           DATABASE_URL: postgresql+asyncpg://procurement:procurement@localhost:5432/procurement
           DATABASE_URL_SYNC: postgresql://procurement:procurement@localhost:5432/procurement
         run: |
           cd backend
+          python -m alembic upgrade head
           python -m app.seed
 
       - name: Start backend
@@ -103,25 +138,26 @@ jobs:
         run: |
           cd backend
           uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-          sleep 3
+          curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://localhost:8000/health
 
       - name: Install and build frontend
         env:
           VITE_GRAPHQL_URL: http://localhost:8000/graphql
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run build
 
       - name: Serve frontend
         run: |
-          npx serve frontend/dist -l 3000 -s &
-          sleep 2
+          cd frontend
+          npm run preview -- --host 127.0.0.1 --port 3000 --strictPort &
+          curl --fail --retry 20 --retry-delay 1 --retry-connrefused http://localhost:3000
 
       - name: Install Playwright
         run: |
           cd e2e
-          npm install
+          npm ci
           npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
